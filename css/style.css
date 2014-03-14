@@ -1,0 +1,45 @@
+body {
+  padding-top: 60px;
+}
+
+label {
+  display: inline;
+}
+
+input {
+  width: 150px;
+  margin: 0 5px;
+}
+
+#project-id:hover {
+  background-color: yellow;
+}
+
+#project-info {
+  margin-bottom: 20px;
+}
+
+#slider {
+  width: 400px;
+  margin-top: 5px;
+}
+
+.chartContainer {
+  clear: left;
+  margin: 40px 0 25px 0;
+  height: 500px;
+}
+
+.chart {
+  float: left;
+  margin-right: 15px;
+}
+
+.legend {
+  margin-bottom: 15px;
+}
+
+.legendFormContainer {
+  float: left;
+  margin-right: 15px;
+}

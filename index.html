@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+
+    <meta http-equiv="content-type" content="text/html; charset=UTF8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="css/jquery-ui.css">
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/bootstrap-responsive.min.css">
+    <link rel="stylesheet" href="css/rickshaw.min.css">
+    <link rel="stylesheet" href="css/style.css">
+
+    <script src="script/jquery.min.js"></script>
+    <script src="script/jquery-ui.min.js"></script>
+    <script src="script/d3.v3.min.js"></script>
+    <script src="script/rickshaw.min.js"></script>
+    <script src="script/bootstrap.min.js"></script>
+    <script src="script/monitoring.js"></script>
+    <script src="script/chart.js"></script>
+    <script src="script/chart-display.js"></script>
+    <script src="script/controller.js"></script>
+
+  </head>
+  <body>
+
+    <div class="navbar navbar-fixed-top">
+      <div class="navbar-inner">
+        <div class="container-fluid">
+          <a class="brand" href="#">Cloud Monitoring API</a>
+          <div class="nav-collapse">
+            <ul class="nav">
+              <li class="active"><a href="#">Home</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="container">
+      <button id="authorize-button" style="visibility: hidden">
+        Authorize
+      </button>
+
+      <div id="project-info">
+        <form id="project-form" style="display: none;">
+          <label>Project ID:</label>
+          <input type="text" id="project-id-field">
+          <input type="button" id="project-button" value="Enter">
+        </form>
+        <p id="project-display" style="display: none;">
+          <label>Project ID:</label>
+          <span id="project-id"></span>
+        </p>
+      </div>
+
+      <div id="time-selector" style="display: none;">
+        <label>Timespan:</label> <span id="timespan-value"></span>
+        <div id="slider"></div>
+      </div>
+
+      <div id="charts"></div>
+    </div>
+
+    <script>
+      (function() {
+        window.clientLoaded = function() {
+          gapi.auth.init(function() {
+            var api = new MonitoringApi();
+            var chartDisplay = new ChartDisplay(api);
+            var controller = new Controller(api, chartDisplay);
+            controller.init();
+          });
+        }
+      })();
+    </script>
+    <script
+        src="https://apis.google.com/js/client.js?onload=clientLoaded">
+    </script>
+
+  </body>
+</html>
