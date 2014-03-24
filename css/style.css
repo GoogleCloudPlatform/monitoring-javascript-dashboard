@@ -46,8 +46,8 @@ input {
 
 .search {
   background-image: url('../images/search.png');
-  width: 20px;
-  height: 20px;
+  width: 12px;
+  height: 12px;
   float: left;
   margin-left: 15px;
 }
