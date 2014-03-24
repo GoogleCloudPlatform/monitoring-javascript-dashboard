@@ -25,9 +25,14 @@ input {
 }
 
 .chartContainer {
-  clear: left;
+  clear: both;
   margin: 40px 0 25px 0;
   height: 500px;
+  width: 1350px;
+}
+
+.error {
+  width: 1350px;
 }
 
 .chart {
@@ -36,10 +41,19 @@ input {
 }
 
 .legend {
-  margin-bottom: 15px;
+  float: left;
 }
 
-.legendFormContainer {
+.search {
+  background-image: url('../images/search.png');
+  width: 20px;
+  height: 20px;
   float: left;
-  margin-right: 15px;
+  margin-left: 15px;
+}
+
+.chartLabelForm {
+  display: none;
+  margin-left: 15px;
+  float: left;
 }

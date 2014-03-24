@@ -25,9 +25,22 @@ var MonitoringApi = function() {
   /**
    * User's project ID. Set via the UI.
    * @type {string}
-   * @private
    */
   this.projectId = null;
+
+  /**
+   * API name.
+   * @type {String}
+   * @private
+   */
+  this.apiName_ = 'cloudmonitoring';
+
+  /**
+   * API version.
+   * @type {String}
+   * @private
+   */
+  this.apiVersion_ = 'v2beta1';
 
   /**
    * Google API Key.
@@ -41,14 +54,14 @@ var MonitoringApi = function() {
    * @type {String}
    * @private
    */
-  this.clientId = '<your-client-id>';
+  this.clientId_ = '<your-client-id>';
 
   /**
    * Google API scope.
    * @type {String}
    * @private
    */
-  this.scopes = 'https://www.googleapis.com/auth/monitoring.readonly';
+  this.scopes_ = 'https://www.googleapis.com/auth/monitoring.readonly';
 };
 
 /**
@@ -58,14 +71,16 @@ var MonitoringApi = function() {
 MonitoringApi.prototype.auth = function(authComplete) {
   gapi.client.setApiKey(this.apiKey_);
   gapi.auth.authorize({
-    client_id: this.clientId,
-    scope: this.scopes,
+    client_id: this.clientId_,
+    scope: this.scopes_,
     immediate: true}, this.handleAuthResult(authComplete));
 };
 
 /**
  * Handle the response from Google's authorization server.
  * @param {Function} authComplete Function to call when authorization is done.
+ * @return {Function} A function to handle response from Google's authorization
+ *     server.
  */
 MonitoringApi.prototype.handleAuthResult = function(authComplete) {
   var self = this;
@@ -78,8 +93,8 @@ MonitoringApi.prototype.handleAuthResult = function(authComplete) {
       $('#authorize-button').css('visibility', '');
       $('#authorize-button').click(function(event) {
         gapi.auth.authorize({
-          client_id: self.clientId,
-          scope: self.scopes,
+          client_id: self.clientId_,
+          scope: self.scopes_,
           immediate: false}, self.handleAuthResult(authComplete));
         return false;
       });
@@ -88,8 +103,8 @@ MonitoringApi.prototype.handleAuthResult = function(authComplete) {
 };
 
 /**
- * Make a call to the Monitoring API and pass
- * the data to the provided callback function.
+ * Make a call to the Monitoring API timeseries.list endpoint. Pass
+ * the returned data to the provided callback function.
  * @param {Object} query Query parameters for the call to the API. For example:
  *     {
  *       timespan: '2d',
@@ -100,14 +115,18 @@ MonitoringApi.prototype.handleAuthResult = function(authComplete) {
 MonitoringApi.prototype.getData = function(query, callback) {
   var self = this;
   var timeseries = [];
+
   // Make a copy of the query in case the pageToken needs to be added.
+  // We don't want the pageToken added to the query object.
   var localQuery = $.extend({}, query);
 
   var makeCall = function() {
-    gapi.client.load('cloudmonitoring', 'v2beta1', function() {
+    gapi.client.load(self.apiName_, self.apiVersion_, function() {
       var request = gapi.client.cloudmonitoring.timeseries.list(localQuery);
       request.execute(function(resp) {
-        $.merge(timeseries, resp.timeseries);
+        if (resp.timeseries) {
+          $.merge(timeseries, resp.timeseries);
+        }
         if (resp.nextPageToken) {
           $.extend(localQuery, {'pageToken': resp.nextPageToken});
           makeCall();
@@ -118,4 +137,39 @@ MonitoringApi.prototype.getData = function(query, callback) {
     });
   };
   makeCall();
+};
+
+/**
+ * Make a call to the Monitoring API metricDescriptors.list endpoint.
+ * @param {function} callback Method to call when API returns.
+ */
+MonitoringApi.prototype.getMetrics = function(callback) {
+  var self = this;
+  gapi.client.load(this.apiName_, this.apiVersion_, function() {
+    var request = gapi.client.cloudmonitoring.metricDescriptors.list({
+      'project': self.projectId
+    });
+    request.execute(function(resp) {
+      callback(resp.metrics);
+    });
+  });
+};
+
+/**
+ * Make a call to the Monitoring API timeseriesDescriptors.list endpoint.
+ * @param {string} metric String metric name (ex:
+ *     compute.googleapis.com/instance/disk/read_latencies)
+ * @param {function} callback Method to call when API returns.
+ */
+MonitoringApi.prototype.getDescriptors = function(metric, callback) {
+  var self = this;
+  gapi.client.load(this.apiName_, this.apiVersion_, function() {
+    var request = gapi.client.cloudmonitoring.timeseriesDescriptors.list({
+      'metric': metric,
+      'project': self.projectId
+    });
+    request.execute(function(resp) {
+      callback(resp.timeseries);
+    });
+  });
 };

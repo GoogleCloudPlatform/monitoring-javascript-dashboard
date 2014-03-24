@@ -21,10 +21,32 @@
  * @constructor
  * @param {Element} chartElement The HTML element in which to add the chart.
  * @param {Element} legendElement The HTML element in which to add the legend.
+ * @param {Element} errorElement The HTML element in which to display an error.
  * @param {Object} api An instance of the MonitoringApi class.
  * @param {Object} query The query specific to this chart.
+ * @param {Function} formatter Function to format the data.
  */
-var Chart = function(chartElement, legendElement, displayOptions, api, query) {
+var Chart = function(
+    chartElement, legendElement, errorElement, api, query, formatter) {
+
+  /**
+   * Element in which to display the chart.
+   * @type {Element}
+   */
+  this.chartElement = chartElement;
+
+  /**
+   * Element in which to display the legend.
+   * @type {Element}
+   */
+  this.legendElement = legendElement;
+
+  /**
+   * Element in which to display an error message.
+   * @type {Element}
+   */
+  this.errorElement = errorElement;
+
   /**
    * Data returned by the Monitoring API and formatted for display on the chart.
    * @type {Object}
@@ -38,27 +60,15 @@ var Chart = function(chartElement, legendElement, displayOptions, api, query) {
   this.query = query;
 
   /**
-   * Options for displaying the chart, such as title and type.
-   * @type {Object}
+   * A function to format the data.
+   * @type {Function}
    */
-  this.displayOptions = displayOptions;
-
-  /**
-   * Element in which to display the chart.
-   * @type {Element}
-   */
-  this.chartElement = chartElement;
-
-  /**
-   * Element in which to display the legend.
-   * @type {Element}
-   */
-
-  this.legendElement = legendElement;
+  this.formatter = formatter;
 
   /**
    * Rickshaw chart.
    * @type {Rickshaw.Graph}
+   * @private
    */
   this.chart_ = null;
 
@@ -68,6 +78,13 @@ var Chart = function(chartElement, legendElement, displayOptions, api, query) {
    * @private
    */
   this.api_ = api;
+
+  /**
+   * Copy of a query for rollback if there's an error.
+   * @type {Object}
+   * @private
+   */
+  this.oldQuery_ = query;
 
   /**
    * Chart height.
@@ -94,24 +111,57 @@ var Chart = function(chartElement, legendElement, displayOptions, api, query) {
 };
 
 /**
- * Update the chart.
+ * Update the chart with the provided query.
  * @param {Object} query The new query (optional).
  */
 Chart.prototype.update = function(query) {
+  // Make a copy of the current query in case there's an error.
+  this.oldQuery_ = $.extend({}, this.query);
+
   // Extend the existing query with the new query. The new query
   // overwrites existing query parameters.
   this.query = $.extend({}, this.query, query);
 
-  // Call the API to get the new data for the chart.
+  this.update_();
+};
+
+/**
+ * Reset the chart by removing all query labels.
+ */
+Chart.prototype.reset = function() {
+  // Remove labels from query.
+  delete this.query.labels;
+  this.update_();
+};
+
+/**
+ * Run the API call to get new data with which to update the chart.
+ * @private
+ */
+Chart.prototype.update_ = function() {
   var self = this;
+
+  // Call the API to get the new data for the chart.
   this.api_.getData(this.query, function(data) {
-    self.data = self.displayOptions.formatter(data);
+    // If there's no data, display an error message and revert to the old query.
+    if (!data.length) {
+      var errorText = ['Query returned no results.'];
+      errorText.push('Query parameters:');
+      errorText.push(JSON.stringify(self.query));
+      self.error_(errorText.join(' '));
+      self.query = self.oldQuery_;
+      return;
+    }
+
+    // Format the data for display in the chart.
+    self.data = self.formatter(data);
 
     // Create the chart if it doesn't exist. This is done the first time.
     if (!self.chart_) {
       self.create_(self.data);
 
     } else {
+      // Boolean value set to true if a series is added or removed.
       var updateLegend = false;
 
       // Replace chart data series with new data.
@@ -123,6 +173,7 @@ Chart.prototype.update = function(query) {
             self.chart_.series[series].data = self.data[data].data;
             exists = true;
           } else if (series == 'active') {
+            // Rickshaw adds this field to the series data, so keep it.
             exists = true;
           }
         }
@@ -159,7 +210,7 @@ Chart.prototype.update = function(query) {
         self.createLegend_();
       }
 
-      // Now, update the chart.
+      // Update the chart.
       self.chart_.update();
     }
   });
@@ -175,8 +226,8 @@ Chart.prototype.create_ = function(data) {
 
   // Create and display the actual Rickshaw chart.
   this.chart_ = new Rickshaw.Graph({
-    element: this.chartElement, 
-    renderer: this.displayOptions.type,
+    element: this.chartElement,
+    renderer: 'line',
     width: this.chartWidth_,
     height: this.chartHeight_,
     series: data,
@@ -202,9 +253,9 @@ Chart.prototype.create_ = function(data) {
     for (var i = 0; i < self.numberTicks_; i++) {
       var tickValue = domain[0] + step * i;
       offsets.push({value: tickValue, unit: unit});
-		}
+    }
     return offsets;
-  }
+  };
   xAxis.render();
 
   // Add the Y axis to the chart.
@@ -217,8 +268,8 @@ Chart.prototype.create_ = function(data) {
   // Add hover state to the chart.
   var hoverDetail = new Rickshaw.Graph.HoverDetail({
     graph: this.chart_,
-    xFormatter: function(x) {
-      return self.stringifyDate_(x);
+    xFormatter: function(date) {
+      return self.stringifyDate_(date);
     }
   });
 
@@ -229,26 +280,120 @@ Chart.prototype.create_ = function(data) {
 /**
  * Create a Rickshaw.Fixtures.Time object for the X axis to display the
  * date as a string.
- * @return A Rickshaw.Fixtures.Time object.
+ * @return {Rickshaw.Fixtures.Time} A Rickshaw.Fixtures.Time object.
  * @private
  */
 Chart.prototype.createTimeFixture_ = function() {
-  var time = new Rickshaw.Fixtures.Time();
-
   var self = this;
+
+  var time = new Rickshaw.Fixtures.Time();
   for (var unit in time.units) {
     // Update the formatters to display the date as a string.
-    time.units[unit].formatter = function(d) {
-      return self.stringifyDate_(d);
+    time.units[unit].formatter = function(date) {
+      var milliseconds = date.getTime();
+      milliseconds /= 1000;
+      return self.stringifyDate_(date);
     };
   }
   return time;
 };
 
 /**
+ * Display a legend next to the graph.
+ * @private
+ */
+Chart.prototype.createLegend_ = function() {
+  $(this.legendElement).empty();
+
+  // Add a legend to the chart.
+  var legend = new Rickshaw.Graph.Legend({
+    graph: this.chart_,
+    element: this.legendElement
+  });
+
+  // Update the render method in the legend to color-code series
+  // according to the distribution range value rather than the series
+  // name. This is done via the legend value within the series object.
+  legend.render = function() {
+    var self = this;
+
+    $(this.list).empty();
+    this.lines = [];
+
+    var series = this.graph.series.map(function(s) {
+      return s;
+    });
+
+    if (!this.naturalOrder) {
+      series = series.reverse();
+    }
+
+    var labels = [];
+    series.forEach(function(s) {
+      if (s.legend) {
+        if (labels.indexOf(s.legend) == -1) {
+          self.addLine(s);
+          labels.push(s.legend);
+        }
+      } else {
+        self.addLine(s);
+      }
+    });
+  };
+
+  // Update the addLine method in the legend object to display the
+  // series legend value as the text rather than the series name.
+  legend.addLine = function(series) {
+    var line = document.createElement('li');
+    line.className = 'line';
+    if (series.disabled) {
+      line.className += ' disabled';
+    }
+    if (series.className) {
+      d3.select(line).classed(series.className, true);
+    }
+
+    var swatch = document.createElement('div');
+    swatch.className = 'swatch';
+    swatch.style.backgroundColor = series.color;
+    line.appendChild(swatch);
+
+    var label = document.createElement('span');
+    label.className = 'label';
+    if (series.legend) {
+      label.innerHTML = series.legend;
+    } else {
+      label.innerHTML = series.name;
+    }
+    line.appendChild(label);
+
+    this.list.appendChild(line);
+
+    line.series = series;
+    if (series.noLegend) {
+      line.style.display = 'none';
+    }
+
+    var _line = {element: line, series: series};
+
+    if (this.shelving) {
+      this.shelving.addAnchor(_line);
+      this.shelving.updateBehaviour();
+    }
+    if (this.highlighter) {
+      this.highlighter.addHighlightEvents(_line);
+    }
+
+    this.lines.push(_line);
+    return line;
+  };
+  legend.render();
+};
+
+/**
  * Format the date as YYYY-mm-dd HH:MM:SS.
  * @param {number} date A date in milliseconds.
- * @return A stringified date object.
+ * @return {string} A stringified date object.
  * @private
  */
 Chart.prototype.stringifyDate_ = function(date) {
@@ -275,21 +420,28 @@ Chart.prototype.stringifyDate_ = function(date) {
 };
 
 /**
- * Display an interactive legend next to the graph.
+ * Display an error message for the chart.
+ * @param {string} errorText An error message to display.
  * @private
  */
-Chart.prototype.createLegend_ = function() {
-  $(this.legendElement).empty();
+Chart.prototype.error_ = function(errorText) {
+  var self = this;
 
-  // Add a legend to the chart.
-  var legend = new Rickshaw.Graph.Legend({
-    graph: this.chart_,
-    element: this.legendElement
-  });
-
-  // Toggle series on and off using the legend. 
-  var toggle = new Rickshaw.Graph.Behavior.Series.Toggle({
-    graph: this.chart_,
-    legend: legend
-  });
+  $(this.errorElement).empty();
+  var error = document.createElement('div');
+  $(error).addClass('alert alert-danger alert-dismissable');
+  $(error).text(errorText);
+  var close = document.createElement('button');
+  $(close).attr('type', 'button');
+  $(close).addClass('close');
+  $(close).attr('data-dismiss', 'alert');
+  $(close).attr('aria-hidden', 'true');
+  $(close).text('x');
+  $(error).append(close);
+  $(this.errorElement).append(error);
+  window.setTimeout(function() {
+    $(error).fadeTo(500, 0).slideUp(500, function() {
+      $(this).remove();
+    });
+  }, 7000);
 };

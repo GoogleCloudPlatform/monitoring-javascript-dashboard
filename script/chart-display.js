@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * @fileoverview Graphs data from the Monitoring API using Rickshaw.
+ * @fileoverview Controls the display of the charts on the page.
  */
 
 /**
@@ -22,6 +22,21 @@
  * @param {Object} api The Monitoring API object.
  */
 var ChartDisplay = function(api) {
+  /**
+   * Values for the range selector.
+   * @type {Array.<string>}
+   */
+  this.timespanValues = ['5m', '10m', '20m', '30m', '40m', '50m', '1h', '2h',
+                         '3h', '4h', '5h', '6h', '7h', '8h', '9h', '10h', '11h',
+                         '12h', '1d', '2d', '3d', '4d', '5d', '6d', '1w',
+                         '2w', '3w', '30d'];
+
+  /**
+   * The default timespan to select on page load.
+   * @type {number}
+   */
+  this.defaultTimespanIndex = 6;
+
   /**
    * The Monitoring API object.
    * @type {Object}
@@ -38,222 +53,76 @@ var ChartDisplay = function(api) {
   this.charts_ = [];
 
   /**
-   * Values for the range selector.
+   * List of default charts to display.
    * @type {Array.<string>}
    * @private
    */
-  this.timespanValues = ['5m', '10m', '20m', '30m','40m', '50m', '1h', '2h',
-                         '3h', '4h', '5h', '6h', '7h', '8h', '9h', '10h', '11h',
-                         '12h', '1d', '2d', '3d', '4d', '5d', '6d', '1w'];
-
-  /**
-   * The default timespan to select on page load.
-   * @type {Object}
-   * @private
-   */
-  this.defaultTimespanIndex = 6;
-
-  /**
-   * Object with data formatting methods for various charts.
-   * @type {Object}
-   * @private
-   */
-  this.formatters_ = {
-    byteConverter: function(dataPoint) {
-      return dataPoint / 1024;
-    },
-    timeConverter: function(dataPoint) {
-      return dataPoint / 3600;
-    }
-  };
-
-  /**
-   * Options for each chart, including the chart type, labels, and
-   * data formatter.
-   * @type {Object}
-   * @private
-   */
-  this.chartDisplayOptions_ = {
-    'compute.googleapis.com': {
-      'instance': {
-        'metrics': {
-          'uptime': {
-            default: true,
-            type: 'line',
-            title: 'Uptime (Hours)',
-            formatter: this.formatDataSimple_(this.formatters_.timeConverter)
-          }
-        },
-        'labels': null
-      },
-      'instance/disk': {
-        'metrics': {
-          'read_ops_count': {
-            default: false,
-            type: 'line',
-            title: 'Read Operations Count',
-            formatter: this.formatDataSimple_()
-          },
-          'write_ops_count': {
-            default: true,
-            type: 'line',
-            title: 'Write Operations Count',
-            formatter: this.formatDataSimple_()
-          },
-          'read_bytes_count': {
-            default: false,
-            type: 'line',
-            title: 'Read Bytes Count (KB)',
-            formatter: this.formatDataSimple_(this.formatters_.byteConverter)
-          },
-          'write_bytes_count': {
-            default: false,
-            type: 'line',
-            title: 'Write Bytes Count (KB)',
-            formatter: this.formatDataSimple_(this.formatters_.byteConverter)
-          },
-          'read_latencies': {
-            default: false,
-            type: 'line',
-            title: 'Read Bytes Count (KB)',
-            formatter: this.formatDataSimple_(this.formatters_.byteConverter)
-          },
-          'write_latencies': {
-            default: false,
-            type: 'line',
-            title: 'Write Bytes Count (KB)',
-            formatter: this.formatDataSimple_(this.formatters_.byteConverter)
-          }
-        },
-        'labels': {
-          'compute.googleapis.com/device_name': 'Device Name',
-          'compute.googleapis.com/device_type': 'Device Type'
-        }
-      },
-      'instance/network': {
-        'metrics': {
-          'received_bytes_count': {
-            default: true,
-            type: 'line',
-            title: 'Received Bytes Count',
-            formatter: this.formatDataSimple_(this.formatters_.byteConverter)
-          },
-          'sent_bytes_count': {
-            default: true,
-            type: 'line',
-            title: 'Sent Bytes Count',
-            formatter: this.formatDataSimple_(this.formatters_.byteConverter)
-          },
-          'received_packets_count': {
-            default: false,
-            type: 'line',
-            title: 'Received Packets Count',
-            formatter: this.formatDataSimple_()
-          },
-          'sent_packets_count': {
-            default: false,
-            type: 'line',
-            title: 'Sent Packets Count',
-            formatter: this.formatDataSimple_()
-          },
-        },
-        'labels': {
-          'compute.googleapis.com/loadbalanced': 'Loadbalanced',
-        }
-      },
-      'instance/cpu': {
-        'metrics': {
-          'usage_time': {
-            default: true,
-            type: 'line',
-            title: 'CPU Usage (Hours)',
-            formatter: this.formatDataSimple_(this.formatters_.timeConverter)
-          },
-          'reserved_cores': {
-            default: false,
-            type: 'line',
-            title: 'Reserved Cores',
-            formatter: this.formatDataSimple_()
-          }
-        },
-        'labels': null
-      },
-      'firewall': {
-        'metrics': {
-          'dropped_bytes_count': {
-            default: false,
-            type: 'line',
-            title: 'Dropped Bytes Count (KB)',
-            formatter: this.formatDataSimple_(this.formatters_.byteConverter)
-          },
-          'dropped_packets_count': {
-            default: true,
-            type: 'line',
-            title: 'Dropped Packets Count',
-            formatter: this.formatDataSimple_()
-          }
-        },
-        'labels': null
-      }
-    },
-    'appengine.googleapis.com': null
-  };
-
-  /**
-   * Labels available to all metrics.
-   * @type {Object}
-   * @private
-   */
-  this.defaultLabels_ = {
-    'location': 'Location',
-    'resource_id': 'Resource ID'
-  };
-
+  this.defaultCharts_ = [
+      'compute.googleapis.com/instance/uptime',
+      'compute.googleapis.com/instance/disk/read_ops_count',
+      'compute.googleapis.com/instance/disk/write_ops_count',
+      'compute.googleapis.com/instance/disk/read_latencies',
+      'compute.googleapis.com/instance/disk/write_latencies',
+      'compute.googleapis.com/instance/network/received_bytes_count',
+      'compute.googleapis.com/instance/network/sent_bytes_count',
+      'compute.googleapis.com/instance/cpu/usage_time',
+      'compute.googleapis.com/firewall/dropped_packets_count'];
 };
 
 /**
- * Add the chart based on the domain and metric.
- * @param {string} domain The domain of the metric (ex, compute.googleapis.com).
- * @param {string} metric The metric name (ex, /instance/uptime).
+ * Add the chart based on the provided metric.
+ * @param {Object} metric A single metric object returned from the
+ *     metricDescriptors.list API endpoint.
  */
-ChartDisplay.prototype.display = function(domain, resource, metric) {
+ChartDisplay.prototype.display = function(metric) {
 
   var chartNumber = this.charts_.length;
-  var displayOptions = this.chartDisplayOptions_[
-      domain][resource].metrics[metric];
 
   // Create a container to hold all chart elements.
   var chartContainer = this.createChartContainer_(chartNumber);
 
-  // Add a title for the chart.
-  var chartTitle = this.createChartTitle_(displayOptions.title);
+  // Create a title for the chart.
+  var chartTitle = this.createChartTitle_(metric.annotations.DESCRIPTION);
   $(chartContainer).append(chartTitle);
 
-  // Create an element in which to display the chart.
+  // Create an error element in which to display errors.
+  var errorElement = this.createErrorElement_(chartNumber);
+  $(chartContainer).append(errorElement);
+
+  // Create an element in which to display the chart itself.
   var chartElement = this.createChartElement_(chartNumber);
   $(chartContainer).append(chartElement);
 
-  // Create a chart legend and form container.
-  var legendFormContainer = this.createLegendFormContainer_();
-
   // Create the chart legend.
   var chartLegend = this.createChartLegend_(chartNumber, chart);
-  $(legendFormContainer).append(chartLegend);
+  $(chartContainer).append(chartLegend);
 
-  // Create the actual chart.
+  // Create a query object to query the API.
   var query = {
-    metric: domain + '/' + resource + '/' + metric,
+    metric: metric.name,
     project: this.api_.projectId,
     timespan: this.timespanValues[this.defaultTimespanIndex]
   };
+
+  // Create a data formatter based on the type of metric.
+  var formatter = null;
+  if (metric.typeDescriptor.valueType == 'distribution') {
+    formatter = this.formatDataDistribution_();
+  } else {
+    formatter = this.formatDataSimple_();
+  }
+
+  // Create the actual chart.
   var chart = new Chart(
-      chartElement, chartLegend, displayOptions, this.api_, query);
+      chartElement, chartLegend, errorElement, this.api_, query, formatter);
 
   // Create the label form.
-  var chartLabelForm = this.createChartLabelForm_(
-      chartNumber, domain, this.chartDisplayOptions_[domain][resource].labels);
-  $(legendFormContainer).append(chartLabelForm);
-  $(chartContainer).append(legendFormContainer);
+  var chartLabelForm = this.createChartLabelForm_(chartNumber, metric);
+
+  // Create the search icon.
+  var searchIcon = this.createSearchIcon_(chartLabelForm);
+  $(chartContainer).append(searchIcon);
+  $(chartContainer).append(chartLabelForm);
 
   // Add the container to the charts HTML element.
   $('#charts').append(chartContainer);
@@ -263,16 +132,18 @@ ChartDisplay.prototype.display = function(domain, resource, metric) {
 };
 
 /**
- * Displays default charts.
- * @param {string} domain The domain for which to display the charts
- *     (ex, compute.googleapis.com).
+ * Displays default charts. Called by the controller once all necessary
+ * initialization steps have been completed.
+ * @return {Function} A function to display the default charts on the page.
  */
-ChartDisplay.prototype.displayDefaultCharts = function(domain) {
-  $('#charts').empty();
-  for (var resource in this.chartDisplayOptions_[domain]) {
-    for (var metric in this.chartDisplayOptions_[domain][resource].metrics) {
-      if (this.chartDisplayOptions_[domain][resource].metrics[metric].default) {
-        this.display(domain, resource, metric);
+ChartDisplay.prototype.displayDefaultCharts = function() {
+  var self = this;
+
+  return function(metrics) {
+    $('#charts').empty();
+    for (var metric in metrics) {
+      if (self.defaultCharts_.indexOf(metrics[metric].name) > -1) {
+        self.display(metrics[metric]);
       }
     }
   }
@@ -281,6 +152,7 @@ ChartDisplay.prototype.displayDefaultCharts = function(domain) {
 /**
  * Update all the charts at a given interval. The interval is set by the
  * controller.
+ * @return {Function} A function to update the charts.
  */
 ChartDisplay.prototype.intervalUpdater = function() {
   var self = this;
@@ -292,28 +164,29 @@ ChartDisplay.prototype.intervalUpdater = function() {
 };
 
 /**
- * Update the timespan of the query.
- * @param {string} timespan The new timespan to use.
+ * Update the timespan of the query. This method is called when the value
+ * of the range selector changes.
+ * @param {string} timespan The new timespan for the query.
  */
 ChartDisplay.prototype.rangeUpdater = function(timespan) {
-  // Get new timespan from range selector.
   for (var chart in this.charts_) {
     this.charts_[chart].update({'timespan': timespan});
-  };
+  }
 };
 
 /**
  * Update the chart with the given labels in the chart form.
  * @param {number} chartNumber The chart number to update.
+ * @return {Function} A function to update the charts with the new query.
  */
 ChartDisplay.prototype.labelUpdater = function(chartNumber) {
   var self = this;
 
   return function() {
-    // Get query parameters from label form.
+    // Get query parameters from label form and add them to the query object.
     var query = {};
     query['labels'] = [];
-    $('input[name="' + chartNumber + '"]').each(function() {
+    $('*[name="' + chartNumber + '"]').each(function() {
       if ($(this).val()) {
         var label = $(this).data('label') + '==' + $(this).val();
         query['labels'].push(label);
@@ -324,9 +197,25 @@ ChartDisplay.prototype.labelUpdater = function(chartNumber) {
 };
 
 /**
- * Create a container for the chart and corresponding elements.
+ * Reset the chart by removing all labels from the query.
+ * @param {number} chartNumber The chart number to update.
+ * @return {Function} A function to reset the charts.
+ */
+ChartDisplay.prototype.reset = function(chartNumber) {
+  var self = this;
+
+  return function() {
+    $('*[name="' + chartNumber + '"]').each(function() {
+      $(this).val('');
+    });
+    self.charts_[chartNumber].reset();
+  };
+};
+
+/**
+ * Create the container for the chart and corresponding elements.
  * @param {number} chartNumber The number of the chart.
- * @return An HTML Element.
+ * @return {Element} An HTML Element.
  * @private
  */
 ChartDisplay.prototype.createChartContainer_ = function(chartNumber) {
@@ -338,9 +227,9 @@ ChartDisplay.prototype.createChartContainer_ = function(chartNumber) {
 };
 
 /**
- * Create a title for the chart.
+ * Create the title for the chart.
  * @param {string} title The title of the chart.
- * @return An HTML Element.
+ * @return {Element} An HTML Element.
  * @private
  */
 ChartDisplay.prototype.createChartTitle_ = function(title) {
@@ -351,9 +240,21 @@ ChartDisplay.prototype.createChartTitle_ = function(title) {
 };
 
 /**
+ * Create the error element for the chart.
+ * @return {Element} An HTML Element.
+ * @private
+ */
+ChartDisplay.prototype.createErrorElement_ = function() {
+  // Add the chart title.
+  var error = document.createElement('div');
+  $(error).addClass('error');
+  return error;
+};
+
+/**
  * Create the HTML element for the actual chart.
  * @param {number} chartNumber The number of the chart.
- * @return An HTML Element.
+ * @return {Element} An HTML Element.
  * @private
  */
 ChartDisplay.prototype.createChartElement_ = function(chartNumber) {
@@ -365,21 +266,9 @@ ChartDisplay.prototype.createChartElement_ = function(chartNumber) {
 };
 
 /**
- * Create a container for the chart and corresponding elements.
- * @return An HTML Element.
- * @private
- */
-ChartDisplay.prototype.createLegendFormContainer_ = function() {
-  // Add the chart container.
-  var legendFormContainer = document.createElement('div');
-  $(legendFormContainer).addClass('legendFormContainer');
-  return legendFormContainer;
-};
-
-/**
- * Create the the HTML Element for the legend.
+ * Create the HTML Element for the legend.
  * @param {number} chartNumber The number of the chart.
- * @return An HTML Element.
+ * @return {Element} An HTML Element.
  * @private
  */
 ChartDisplay.prototype.createChartLegend_ = function(chartNumber) {
@@ -393,55 +282,120 @@ ChartDisplay.prototype.createChartLegend_ = function(chartNumber) {
 /**
  * Create the label form.
  * @param {number} chartNumber The number of the chart.
- * @param {string} domain The domain (example, compute.googleapis.com).
- * @param {Object} Object mapping the API label to a display name.
- * @return An HTML Element.
+ * @param {Object} metric Metric object returned from the API.
+ * @return {Element} An HTML Element.
  * @private
  */
-ChartDisplay.prototype.createChartLabelForm_ = function(
-    chartNumber, domain, labels) {
+ChartDisplay.prototype.createChartLabelForm_ = function(chartNumber, metric) {
+  var self = this;
+
   // Add the label form.
   var formContainer = document.createElement('form');
-  $(formContainer).addClass('labelForm');
+  $(formContainer).addClass('chartLabelForm');
 
-  for (var label in this.defaultLabels_) {
-    this.addLabelInput_(
-        formContainer,
-        chartNumber,
-        this.defaultLabels_[label],
-        'cloud.googleapis.com/' + label);
-  }
-  for (var label in labels) {
-    this.addLabelInput_(
-        formContainer, chartNumber, labels[label], domain + '/' + label);
-  }
-  var button = document.createElement('input');
-  $(button).attr('type', 'button');
-  $(button).val('Go');
-  $(button).click(this.labelUpdater(chartNumber));
-  $(formContainer).append(button);
+  // Display the labels specific to the metric by getting them from the API.
+  this.api_.getDescriptors(metric.name, function(descriptors) {
+
+    // Create a dictionary mapping label name to all possible values
+    // using the metricDescriptors.list API endpoint.
+    var descriptorLists = {};
+    for (var descriptor in descriptors) {
+      for (var label in descriptors[descriptor].labels) {
+        if (!descriptorLists[label]) {
+          descriptorLists[label] = [];
+        }
+        var labelValue = descriptors[descriptor].labels[label];
+        if (descriptorLists[label].indexOf(labelValue) == -1) {
+          descriptorLists[label].push(labelValue);
+        }
+      }
+    }
+
+    // For each label, add an input with drop-down selector using all possible
+    // label values.
+    for (var label in metric.labels) {
+      var labelName = metric.labels[label].key;
+      self.addLabelInput_(
+          formContainer,
+          chartNumber,
+          labelName,
+          descriptorLists[labelName]);
+    }
+
+    // Add Go and Reset buttons to the form.
+    var go = document.createElement('input');
+    $(go).attr('type', 'button');
+    $(go).val('Go');
+    $(go).click(self.labelUpdater(chartNumber));
+    $(formContainer).append(go);
+    var reset = document.createElement('input');
+    $(reset).attr('type', 'button');
+    $(reset).val('Reset');
+    $(reset).click(self.reset(chartNumber));
+    $(formContainer).append(reset);
+  });
+
   return formContainer;
 };
 
 /**
- * Add a form label and text input for a given API label.
+ * Create the search icon.
+ * @param {Element} chartLabelForm The HTML element in which the chart label
+ *     form is displayed.
+ * @return {Element} An HTML Element.
+ * @private
+ */
+ChartDisplay.prototype.createSearchIcon_ = function(chartLabelForm) {
+  // Add the search icon.
+  var search = document.createElement('div');
+  $(search).addClass('search');
+
+  // When the search icon is clicked, hide or display the label form.
+  $(search).click(function() {
+    if ($(chartLabelForm).css('display') == 'none') {
+      $(chartLabelForm).fadeIn(500);
+    } else {
+      $(chartLabelForm).fadeOut(500);
+    }
+  });
+
+  return search;
+};
+
+/**
+ * Add a form label and input for a given API label.
  * @param {Element} formContainer The container for the form elements.
  * @param {number} chartNumber The chart number.
- * @param {string} labelText The text to display in the form label.
- * @param {string} label The API label.
+ * @param {string} label The text to display in the form label.
+ * @param {Array.<string>} descriptors A list of values for the select menu.
  * @private
  */
 ChartDisplay.prototype.addLabelInput_ = function(
-    formContainer, chartNumber, labelText, label) {
+    formContainer, chartNumber, label, descriptors) {
   var formLabel = document.createElement('label');
-  $(formLabel).text(labelText + ': ');
+  $(formLabel).text(label + ': ');
   $(formContainer).append(formLabel);
 
-  var inputLabel = document.createElement('input');
-  $(inputLabel).attr('type', 'text');
-  $(inputLabel).attr('name',  chartNumber);
-  $(inputLabel).data('label', label);
-  $(formContainer).append(inputLabel);
+  var input = null;
+  if (descriptors) {
+    input = document.createElement('select');
+    var option = document.createElement('option');
+    $(option).attr('value', '');
+    $(option).text('--Select--');
+    $(input).append(option);
+    for (var descriptor in descriptors) {
+      var option = document.createElement('option');
+      $(option).attr('value', descriptors[descriptor]);
+      $(option).text(descriptors[descriptor]);
+      $(input).append(option);
+    }
+  } else {
+    input = document.createElement('input');
+    $(input).attr('type', 'text');
+  }
+  $(input).attr('name', chartNumber);
+  $(input).data('label', label);
+  $(formContainer).append(input);
 
   var lineBreak = document.createElement('br');
   $(formContainer).append(lineBreak);
@@ -449,38 +403,25 @@ ChartDisplay.prototype.addLabelInput_ = function(
 
 /**
  * Format the data for display in the chart.
- * @param {Function} valueFormatFunction Function to format the data for
- *     the specific metric.
- * @return A function for formatting the data.
+ * @return {Function} A function for formatting the data.
  * @private
  */
-ChartDisplay.prototype.formatDataSimple_ = function(valueFormatFunction) {
+ChartDisplay.prototype.formatDataSimple_ = function() {
   return function(data) {
     var formattedData = [];
     var palette = new Rickshaw.Color.Palette({scheme: 'munin'});
 
+    // Create a list of objects (aka, series) for display in the chart.
+    // List is formatted as follows:
+    // [{
+    //   name: <instance-name|resource-id>,
+    //   data: <data-points>,
+    //   color: <color>
+    // }, ...]
     for (var timeseries in data) {
-      // Create a series of data formatted for the chart.
       var formattedSeries = {};
 
-      // Format the data as [{x: <x-value, y: <y-value>},...].
-      formattedSeries.data = [];
-      for (var point in data[timeseries].points) {
-        var formattedDataPoint = {};
-        if (valueFormatFunction) {
-          formattedDataPoint.y = valueFormatFunction(
-              data[timeseries].points[point].singularValue);
-        } else {
-          formattedDataPoint.y = data[timeseries].points[point].singularValue;
-        }
-        formattedDataPoint.x = new Date(
-              data[timeseries].points[point].end).getTime();
-        formattedSeries.data.push(formattedDataPoint);
-      }
-      //Reverse the data so it's in ascending order. Required for Rickshaw.
-      formattedSeries.data.reverse();
-
-      // Add a name to the series.
+      // Add a name to the series. Name is displayed in the legend.
       var resourceType = data[timeseries].timeseriesDesc.labels[
           'cloud.googleapis.com/resource_type'];
       if (resourceType == 'instance') {
@@ -491,9 +432,119 @@ ChartDisplay.prototype.formatDataSimple_ = function(valueFormatFunction) {
           'cloud.googleapis.com/resource_id'];
       }
 
-      // Add a color to the data.
+      // Add the data to the series, formatted as a list of objects with syntax:
+      // [{x: <time>, y: <value>},...].
+      formattedSeries.data = [];
+      for (var point in data[timeseries].points) {
+        var formattedDataPoint = {};
+        formattedDataPoint.y = data[timeseries].points[point].singularValue;
+        formattedDataPoint.x = new Date(
+              data[timeseries].points[point].end).getTime();
+        // Since Rickshaw requires times in ascending order, and the API
+        // returns the data in descending order, add the value to the
+        // beginning of the list.
+        formattedSeries.data.unshift(formattedDataPoint);
+      }
+
+      // Add a color to the data using the Rickshaw.Color.Palette.
       formattedSeries.color = palette.color();
 
+      formattedData.push(formattedSeries);
+    }
+    return formattedData;
+  };
+};
+
+/**
+ * Format the data for display in the chart.
+ * @return {Function} A function for formatting the data.
+ * @private
+ */
+ChartDisplay.prototype.formatDataDistribution_ = function() {
+  return function(data) {
+    // Create a temporary object mapping name to data and range. Syntax:
+    // {
+    //   <(instance-name|resource-id):distribution-range>: {
+    //     data: <data-points>,
+    //     range: <distribution-range>
+    //   } ...
+    // }
+    var tempData = {};
+
+    // Create an object to map the range to a color.
+    var colorForRange = {};
+
+    for (var timeseries in data) {
+      // Get the instance name or resource ID depending on resource type.
+      var resourceName = null;
+      var resourceType = data[timeseries].timeseriesDesc.labels[
+          'cloud.googleapis.com/resource_type'];
+      if (resourceType == 'instance') {
+        resourceName = data[timeseries].timeseriesDesc.labels[
+          'compute.googleapis.com/instance_name'];
+      } else {
+        resourceName = data[timeseries].timeseriesDesc.labels[
+          'cloud.googleapis.com/resource_id'];
+      }
+
+      // Fill in the tempData object with data from the timeseries buckets.
+      for (var point in data[timeseries].points) {
+        var time = new Date(data[timeseries].points[point].end).getTime();
+        if (data[timeseries].points[point].distributionValue) {
+          for (var bucket in data[timeseries].points[
+              point].distributionValue.buckets) {
+
+            // Find the distribution range.
+            var lower = data[timeseries].points[
+                point].distributionValue.buckets[bucket].lowerBound;
+            var upper = data[timeseries].points[
+                point].distributionValue.buckets[bucket].upperBound;
+            var range = lower + '-' + upper;
+            colorForRange[range] = null;
+
+            // Create the key from the resource name and range, create
+            // a field in the object for that key if it doesn't exist.
+            var seriesName = resourceName + ':' + range;
+            if (!tempData[seriesName]) {
+              tempData[seriesName] = {
+                data: [],
+                range: range
+              };
+            }
+
+            // Since Rickshaw requires times in ascending order, and the API
+            // returns the data in descending order, add the value to the
+            // beginning of the list.
+            var value = data[timeseries].points[
+                point].distributionValue.buckets[bucket].count;
+            tempData[seriesName].data.unshift({y: value, x: time});
+          }
+        }
+      }
+    }
+
+    // Apply a color to a range.
+    var palette = new Rickshaw.Color.Palette({scheme: 'munin'});
+    for (var range in colorForRange) {
+      colorForRange[range] = palette.color();
+    }
+
+    // Use the tempData and colorForRange objects to construct a list of
+    // series formatted for display in the chart. Syntax:
+    // {
+    //   name: <name>,
+    //   data: <data-points>,
+    //   legend: <distribution-range>,
+    //   color: <line-color>
+    // }
+    var formattedData = [];
+    for (var seriesName in tempData) {
+      var formattedSeries = {};
+      formattedSeries.name = seriesName;
+      formattedSeries.data = tempData[seriesName].data;
+      // The legend field is used to display the text in the legend.
+      formattedSeries.legend = tempData[seriesName].range;
+      formattedSeries.color = colorForRange[tempData[seriesName].range];
       formattedData.push(formattedSeries);
     }
     return formattedData;

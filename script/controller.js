@@ -25,7 +25,7 @@
  */
 var Controller = function(api, chartDisplay) {
   /**
-   * Interval at which to update the charts.
+   * Interval at which to update the charts in milliseconds.
    * @type {number}
    */
   this.chartInterval = 20000;
@@ -45,7 +45,7 @@ var Controller = function(api, chartDisplay) {
   this.chartDisplay_ = chartDisplay;
 
   /**
-   * Interval to update charts with new data.
+   * Interval which updates charts with new data.
    * @type {Object}
    * @private
    */
@@ -53,9 +53,12 @@ var Controller = function(api, chartDisplay) {
 };
 
 /**
- * Start OAuth 2.0 flow and initialize events on HTML elements.
+ * Start OAuth 2.0 flow and initialize events on HTML elements. Initiate the
+ * update interval.
  */
 Controller.prototype.init = function() {
+  var self = this;
+
   // Initialize OAuth 2.0 flow.
   window.setTimeout(this.api_.auth(this.checkProjectId_()), 1);
 
@@ -64,10 +67,8 @@ Controller.prototype.init = function() {
   $('#project-id').click(this.resetProjectId_());
 
   // Initialize the slider and slider text.
-  $('#timespan-value').text(
-      this.chartDisplay_.timespanValues[
-          this.chartDisplay_.defaultTimespanIndex]);
-  var self = this;
+  $('#timespan-value').text(this.chartDisplay_.timespanValues[
+      this.chartDisplay_.defaultTimespanIndex]);
   $('#slider').slider({
     min: 0,
     max: this.chartDisplay_.timespanValues.length - 1,
@@ -95,6 +96,7 @@ Controller.prototype.init = function() {
  * Check whether the project ID has already been set in local storage. If
  * it has, show the project ID and charts on the page. If not, display
  * the project form.
+ * @return {Function} A function to test if project ID is set.
  * @private
  */
 Controller.prototype.checkProjectId_ = function() {
@@ -105,7 +107,7 @@ Controller.prototype.checkProjectId_ = function() {
       var projectId = localStorage.getItem('project-id');
       if (projectId) {
         self.api_.projectId = projectId;
-        self.updatePage_()();
+        self.displayCharts_()();
         return;
       }
     }
@@ -117,21 +119,25 @@ Controller.prototype.checkProjectId_ = function() {
 /**
  * Store the project ID in local storage and set the api project ID. This
  * method is called when project form button is clicked.
+ * @return {Function} A function to store project ID.
  * @private
  */
 Controller.prototype.setProjectId_ = function() {
   var self = this;
 
   return function() {
+    // Get the value of the project ID from the form.
     var projectId = $('#project-id-field').val();
 
     if (projectId) {
+      // If storage exists, store the project ID locally so the user
+      // doesn't have to keep entering it every time they visit the page.
       if (typeof(Storage) !== 'undefined') {
         localStorage.setItem('project-id', projectId);
       }
 
       self.api_.projectId = projectId;
-      self.updatePage_()();
+      self.displayCharts_()();
 
     } else {
       alert('Project ID required!');
@@ -142,7 +148,7 @@ Controller.prototype.setProjectId_ = function() {
 /**
  * Allow the user to reset the project ID by showing the project ID form.
  * This method is called when the user clicks on the project ID.
- * @return A function to display the project ID form.
+ * @return {Function} A function to display the project ID form.
  * @private
  */
 Controller.prototype.resetProjectId_ = function() {
@@ -156,15 +162,16 @@ Controller.prototype.resetProjectId_ = function() {
 
 /**
  * Display the project ID on the page, hide the project form, and show charts.
+ * @return {Function} A function to display the charts.
  * @private
  */
-Controller.prototype.updatePage_ = function() {
+Controller.prototype.displayCharts_ = function() {
   var self = this;
   return function() {
     $('#project-form').css('display', 'none');
     $('#time-selector').css('display', 'inline');
     $('#project-display').css('display', 'inline');
     $('#project-id').text(self.api_.projectId);
-    self.chartDisplay_.displayDefaultCharts('compute.googleapis.com');
+    self.api_.getMetrics(self.chartDisplay_.displayDefaultCharts());
   };
 };
