@@ -66,7 +66,8 @@ var ChartDisplay = function(api) {
       'compute.googleapis.com/instance/network/received_bytes_count',
       'compute.googleapis.com/instance/network/sent_bytes_count',
       'compute.googleapis.com/instance/cpu/usage_time',
-      'compute.googleapis.com/firewall/dropped_packets_count'];
+      'compute.googleapis.com/firewall/dropped_packets_count'
+  ];
 };
 
 /**
@@ -464,9 +465,10 @@ ChartDisplay.prototype.formatDataDistribution_ = function() {
   return function(data) {
     // Create a temporary object mapping name to data and range. Syntax:
     // {
-    //   <(instance-name|resource-id):distribution-range>: {
+    //   <resource-id:distribution-range>: {
     //     data: <data-points>,
-    //     range: <distribution-range>
+    //     range: <distribution-range>,
+    //     name: <(instance-name|resource-id):distribution-range>
     //   } ...
     // }
     var tempData = {};
@@ -475,16 +477,17 @@ ChartDisplay.prototype.formatDataDistribution_ = function() {
     var colorForRange = {};
 
     for (var timeseries in data) {
-      // Get the instance name or resource ID depending on resource type.
+      // Get the instance name and resource ID.
       var resourceName = null;
+      var resourceId = data[timeseries].timeseriesDesc.labels[
+          'cloud.googleapis.com/resource_id'];
       var resourceType = data[timeseries].timeseriesDesc.labels[
           'cloud.googleapis.com/resource_type'];
       if (resourceType == 'instance') {
         resourceName = data[timeseries].timeseriesDesc.labels[
           'compute.googleapis.com/instance_name'];
       } else {
-        resourceName = data[timeseries].timeseriesDesc.labels[
-          'cloud.googleapis.com/resource_id'];
+        resourceName = resourceId;
       }
 
       // Fill in the tempData object with data from the timeseries buckets.
@@ -500,15 +503,18 @@ ChartDisplay.prototype.formatDataDistribution_ = function() {
             var upper = data[timeseries].points[
                 point].distributionValue.buckets[bucket].upperBound;
             var range = lower + '-' + upper;
+
+            // Add a field to the colorForRange object for the range.
             colorForRange[range] = null;
 
-            // Create the key from the resource name and range, create
+            // Create the key from the resource ID and range, create
             // a field in the object for that key if it doesn't exist.
-            var seriesName = resourceName + ':' + range;
-            if (!tempData[seriesName]) {
-              tempData[seriesName] = {
+            var resourceRange = resourceId + ':' + range;
+            if (!tempData[resourceRange]) {
+              tempData[resourceRange] = {
                 data: [],
-                range: range
+                range: range,
+                name: resourceName + ':' + range
               };
             }
 
@@ -517,7 +523,7 @@ ChartDisplay.prototype.formatDataDistribution_ = function() {
             // beginning of the list.
             var value = data[timeseries].points[
                 point].distributionValue.buckets[bucket].count;
-            tempData[seriesName].data.unshift({y: value, x: time});
+            tempData[resourceRange].data.unshift({y: value, x: time});
           }
         }
       }
@@ -538,13 +544,13 @@ ChartDisplay.prototype.formatDataDistribution_ = function() {
     //   color: <line-color>
     // }
     var formattedData = [];
-    for (var seriesName in tempData) {
+    for (var resourceRange in tempData) {
       var formattedSeries = {};
-      formattedSeries.name = seriesName;
-      formattedSeries.data = tempData[seriesName].data;
+      formattedSeries.name = tempData[resourceRange].name;
+      formattedSeries.data = tempData[resourceRange].data;
       // The legend field is used to display the text in the legend.
-      formattedSeries.legend = tempData[seriesName].range;
-      formattedSeries.color = colorForRange[tempData[seriesName].range];
+      formattedSeries.legend = tempData[resourceRange].range;
+      formattedSeries.color = colorForRange[tempData[resourceRange].range];
       formattedData.push(formattedSeries);
     }
     return formattedData;
