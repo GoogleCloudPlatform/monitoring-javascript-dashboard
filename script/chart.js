@@ -290,8 +290,6 @@ Chart.prototype.createTimeFixture_ = function() {
   for (var unit in time.units) {
     // Update the formatters to display the date as a string.
     time.units[unit].formatter = function(date) {
-      var milliseconds = date.getTime();
-      milliseconds /= 1000;
       return self.stringifyDate_(date);
     };
   }
