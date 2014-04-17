@@ -83,7 +83,7 @@ ChartDisplay.prototype.display = function(metric) {
   var chartContainer = this.createChartContainer_(chartNumber);
 
   // Create a title for the chart.
-  var chartTitle = this.createChartTitle_(metric.annotations.DESCRIPTION);
+  var chartTitle = this.createChartTitle_(metric.description);
   $(chartContainer).append(chartTitle);
 
   // Create an error element in which to display errors.
