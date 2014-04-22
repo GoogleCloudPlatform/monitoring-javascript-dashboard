@@ -119,6 +119,7 @@ MonitoringApi.prototype.getData = function(query, callback) {
   // Make a copy of the query in case the pageToken needs to be added.
   // We don't want the pageToken added to the query object.
   var localQuery = $.extend({}, query);
+  localQuery.youngest = new Date().toISOString();
 
   var makeCall = function() {
     gapi.client.load(self.apiName_, self.apiVersion_, function() {
