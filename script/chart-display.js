@@ -109,8 +109,10 @@ ChartDisplay.prototype.display = function(metric) {
   var formatter = null;
   if (metric.typeDescriptor.valueType == 'distribution') {
     formatter = this.formatDataDistribution_();
+  } else if (metric.typeDescriptor.valueType == 'double') {
+    formatter = this.formatDataSimple_('doubleValue');
   } else {
-    formatter = this.formatDataSimple_();
+    formatter = this.formatDataSimple_('int64Value');
   }
 
   // Create the actual chart.
@@ -407,7 +409,7 @@ ChartDisplay.prototype.addLabelInput_ = function(
  * @return {Function} A function for formatting the data.
  * @private
  */
-ChartDisplay.prototype.formatDataSimple_ = function() {
+ChartDisplay.prototype.formatDataSimple_ = function(valueKey) {
   return function(data) {
     var formattedData = [];
     var palette = new Rickshaw.Color.Palette({scheme: 'munin'});
@@ -438,7 +440,11 @@ ChartDisplay.prototype.formatDataSimple_ = function() {
       formattedSeries.data = [];
       for (var point in data[timeseries].points) {
         var formattedDataPoint = {};
-        formattedDataPoint.y = data[timeseries].points[point].singularValue;
+        var y = data[timeseries].points[point][valueKey];
+        if (valueKey == 'int64Value') {
+          y = parseInt(y);
+        }
+        formattedDataPoint.y = y;
         formattedDataPoint.x = new Date(
               data[timeseries].points[point].end).getTime();
         // Since Rickshaw requires times in ascending order, and the API
@@ -521,8 +527,8 @@ ChartDisplay.prototype.formatDataDistribution_ = function() {
             // Since Rickshaw requires times in ascending order, and the API
             // returns the data in descending order, add the value to the
             // beginning of the list.
-            var value = data[timeseries].points[
-                point].distributionValue.buckets[bucket].count;
+            var value = parseInt(data[timeseries].points[
+                point].distributionValue.buckets[bucket].count);
             tempData[resourceRange].data.unshift({y: value, x: time});
           }
         }

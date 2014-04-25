@@ -17,6 +17,18 @@
  */
 
 /**
+ * The MonitoringApiException class is thrown when there's an API error.
+ * @constructor
+ */
+var MonitoringApiException = function(response) {
+  /**
+   * JSON response object.
+   * @type {Object}
+   */
+  this.response = response;
+};
+
+/**
  * The MonitoringApi class performs authorization and retrieves
  * data from the Monitoring API.
  * @constructor
@@ -124,15 +136,19 @@ MonitoringApi.prototype.getData = function(query, callback) {
   var makeCall = function() {
     gapi.client.load(self.apiName_, self.apiVersion_, function() {
       var request = gapi.client.cloudmonitoring.timeseries.list(localQuery);
-      request.execute(function(resp) {
-        if (resp.timeseries) {
-          $.merge(timeseries, resp.timeseries);
-        }
-        if (resp.nextPageToken) {
-          $.extend(localQuery, {'pageToken': resp.nextPageToken});
-          makeCall();
+      request.execute(function(response) {
+        if (response.timeseries) {
+          $.merge(timeseries, response.timeseries);
+          if (response.nextPageToken) {
+            $.extend(localQuery, {'pageToken': response.nextPageToken});
+            makeCall();
+          } else {
+            callback(timeseries);
+          }
         } else {
-          callback(timeseries);
+          // If there's no timeseries data, there was a problem. Return the
+          // response to display in the error message.
+          callback(timeseries, response);
         }
       });
     });
@@ -150,8 +166,8 @@ MonitoringApi.prototype.getMetrics = function(callback) {
     var request = gapi.client.cloudmonitoring.metricDescriptors.list({
       'project': self.projectId
     });
-    request.execute(function(resp) {
-      callback(resp.metrics);
+    request.execute(function(response) {
+      callback(response.metrics);
     });
   });
 };
@@ -169,8 +185,8 @@ MonitoringApi.prototype.getDescriptors = function(metric, callback) {
       'metric': metric,
       'project': self.projectId
     });
-    request.execute(function(resp) {
-      callback(resp.timeseries);
+    request.execute(function(response) {
+      callback(response.timeseries);
     });
   });
 };

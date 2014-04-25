@@ -142,12 +142,13 @@ Chart.prototype.update_ = function() {
   var self = this;
 
   // Call the API to get the new data for the chart.
-  this.api_.getData(this.query, function(data) {
+  this.api_.getData(this.query, function(data, response) {
     // If there's no data, display an error message and revert to the old query.
-    if (!data.length) {
+    if (response) {
       var errorText = ['Query returned no results.'];
       errorText.push('Query parameters:');
       errorText.push(JSON.stringify(self.query));
+      errorText.push(JSON.stringify(response));
       self.error_(errorText.join(' '));
       self.query = self.oldQuery_;
       return;
@@ -438,7 +439,7 @@ Chart.prototype.error_ = function(errorText) {
   $(error).append(close);
   $(this.errorElement).append(error);
   window.setTimeout(function() {
-    $(error).fadeTo(500, 0).slideUp(500, function() {
+    $(error).fadeTo(200, 0).slideUp(700, function() {
       $(this).remove();
     });
   }, 7000);
