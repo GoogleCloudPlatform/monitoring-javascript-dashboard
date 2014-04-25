@@ -17,18 +17,6 @@
  */
 
 /**
- * The MonitoringApiException class is thrown when there's an API error.
- * @constructor
- */
-var MonitoringApiException = function(response) {
-  /**
-   * JSON response object.
-   * @type {Object}
-   */
-  this.response = response;
-};
-
-/**
  * The MonitoringApi class performs authorization and retrieves
  * data from the Monitoring API.
  * @constructor
